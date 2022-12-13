@@ -1,10 +1,13 @@
 import pygame
 from sprite import GenericSprite
+from player import Player
 from settings import *
 
 class YSortedCameraGroup(pygame.sprite.Group):
-    def __init__(self) -> None:
+    def __init__(self, enemy_sprites : pygame.sprite.Group) -> None:
         super().__init__()
+        
+        self.enemy_sprites = enemy_sprites
         
         self.display_surface = pygame.display.get_surface()
         self.half_width = self.display_surface.get_size()[0] // 2
@@ -13,6 +16,10 @@ class YSortedCameraGroup(pygame.sprite.Group):
 
         self.floor_surface = pygame.image.load(GRAPHICS_PATH + 'tilemap' + FOLDER_SEPARATOR + 'ground.png').convert()
         self.floor_rect = self.floor_surface.get_rect(topleft = (0,0))
+
+    def enemy_update(self, player : Player) -> None:
+        for enemy in self.enemy_sprites:
+            enemy.enemy_update(player)
 
     def custom_draw(self, reference : GenericSprite):
         self.offset.x = reference.rect.centerx - self.half_width
