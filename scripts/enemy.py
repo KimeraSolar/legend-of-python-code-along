@@ -3,16 +3,22 @@ from event_timer import Timer
 from sprite import DynamicSprite
 from player import Player
 from utils import import_folder
+from numbers import Number
 from settings import *
 
 class Enemy(DynamicSprite):
-    def __init__(self, pos: tuple, monster_name : str, collision_sprites: pygame.sprite.Group, groups: pygame.sprite.Group | list[pygame.sprite.Group]) -> None:
+    def __init__(self, pos: tuple, monster_name : str, collision_sprites: pygame.sprite.Group, groups: pygame.sprite.Group | list[pygame.sprite.Group], hit_player : callable) -> None:
         self.sprite_type = 'enemy'
         self.monster_name = monster_name
-        self.stats = MONSTER_DATA[monster_name]
+        self.hit_player = hit_player
+        self.stats_setup(monster_name)
         self.animation_setup()
         self.graphics_setup()
         super().__init__(pos, self.animations[self.status][self.frame_index], collision_sprites, groups, inflation_rate=(0, -10))
+
+    def stats_setup(self, monster_name : str)-> None:
+        self.stats = MONSTER_DATA[monster_name]
+        self.health = self.stats['health']
 
     def timers_setup(self) -> None:
         super().timers_setup()
@@ -36,16 +42,22 @@ class Enemy(DynamicSprite):
         if distance <= self.stats['attack_radius'] and not self.timers['attack cooldown'].active:
             self.timers['attack cooldown'].activate()
             self.timers['attack'].activate()
-            print('attack')
+            self.hit_player(
+                attack_type=MONSTER_DATA[self.monster_name]['attack_type'],
+                attack_damage=MONSTER_DATA[self.monster_name]['damage']
+            )
         elif distance <= self.stats['notice_radius']:
             self.status = 'move'
-            self.direction = direction
         else:
             self.status = 'idle'
             self.direction = pygame.math.Vector2()
 
         if self.timers['attack'].active:
             self.status = 'attack'
+
+    def damage_reaction(self):
+        if self.timers['damage cooldown'].active:
+            self.direction *= -MONSTER_DATA[self.monster_name]['resistance']
 
     def graphics_setup(self) -> None:
         full_path = GRAPHICS_PATH + 'monsters' + FOLDER_SEPARATOR + self.monster_name + FOLDER_SEPARATOR
@@ -58,3 +70,4 @@ class Enemy(DynamicSprite):
     
     def enemy_update(self, player : Player) -> None:
         self.get_status(player)
+        self.damage_reaction()

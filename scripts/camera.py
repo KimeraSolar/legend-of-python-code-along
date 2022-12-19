@@ -28,6 +28,8 @@ class YSortedCameraGroup(pygame.sprite.Group):
         floor_offset_pos = self.floor_rect.topleft - self.offset
         self.display_surface.blit(self.floor_surface, floor_offset_pos)
 
-        for sprite in sorted(self.sprites(), key=lambda sprite : sprite.rect.centery):
-            offset_pos = sprite.rect.topleft - self.offset
-            self.display_surface.blit(sprite.image, offset_pos)
+        for layer in LAYERS.values():
+            sprites = filter(  lambda s : s.z_layer == layer , self.sprites())
+            for sprite in sorted(sprites, key=lambda sprite : sprite.rect.centery):
+                offset_pos = sprite.rect.topleft - self.offset
+                self.display_surface.blit(sprite.image, offset_pos)

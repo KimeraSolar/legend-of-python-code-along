@@ -1,6 +1,5 @@
 import pygame
-from weapon import Weapon
-from magic import Magic
+from attack import Weapon, Magic
 from settings import *
 from tile import Tile
 from utils import import_csv_layout, import_folder
@@ -8,6 +7,7 @@ from player import Player
 from enemy import Enemy
 from camera import YSortedCameraGroup
 from ui import UI
+from numbers import Number
 from random import choice
 
 class Level:
@@ -16,12 +16,15 @@ class Level:
         self.map_setup()
         self.attack_setup()
         self.ui_setup()
+        self.running = True
 
     def ui_setup(self) -> None:
         self.ui = UI()
 
     def sprites_groups_setup(self) -> None:
         self.collision_sprites = pygame.sprite.Group()
+        self.attack_sprites = pygame.sprite.Group()
+        self.attackable_sprites = pygame.sprite.Group()
         self.enemies = pygame.sprite.Group()
         self.visible_sprites = YSortedCameraGroup(self.enemies)
 
@@ -54,7 +57,7 @@ class Level:
                             random_grass_image = choice(graphics['grass'])
                             Tile(
                                 pos=(x, y),
-                                groups=[self.visible_sprites, self.collision_sprites],
+                                groups=[self.visible_sprites, self.collision_sprites, self.attackable_sprites],
                                 sprite_type='grass',
                                 surface=random_grass_image
                             )
@@ -65,7 +68,8 @@ class Level:
                                 pos=(x, y),
                                 groups=[self.visible_sprites, self.collision_sprites],
                                 sprite_type='large object',
-                                surface=surface
+                                surface=surface,
+                                inflation_rate=(-30, -90),
                             )
                         elif style == 'entities':
                             if cel == '394':
@@ -77,6 +81,7 @@ class Level:
                                     destroy_attack = self.destroy_attack,
                                     create_magic = self.create_magic,
                                     destroy_magic = self.destroy_magic,
+                                    end_game = self.game_over,
                                 )
                             else:
                                 if cel == '390' : monster_name = 'bamboo'
@@ -86,8 +91,9 @@ class Level:
                                 Enemy(
                                     pos=(x, y),
                                     collision_sprites=self.collision_sprites,
-                                    groups=[self.visible_sprites, self.enemies],
-                                    monster_name=monster_name
+                                    groups=[self.visible_sprites, self.enemies, self.attackable_sprites],
+                                    monster_name=monster_name,
+                                    hit_player=self.enemy_attack,
                                 )
 
     def attack_setup(self) -> None:
@@ -95,7 +101,7 @@ class Level:
         self.current_spell = None
 
     def create_attack(self) -> None:
-        self.current_attack = Weapon(self.player, groups=[self.visible_sprites])
+        self.current_attack = Weapon(self.player, groups=[self.visible_sprites, self.attack_sprites])
 
     def destroy_attack(self) -> None:
         if self.current_attack:
@@ -103,15 +109,33 @@ class Level:
         self.current_attack = None
 
     def create_magic(self) -> None:
-        self.current_spell = Magic(self.player, self.visible_sprites)
+        self.current_spell = Magic(self.player, groups=[self.visible_sprites, self.attack_sprites])
 
     def destroy_magic(self) -> None:
         if self.current_spell:
             self.current_spell.kill()
         self.current_spell = None
 
+    def player_attack(self) -> None:
+        for attack_sprite in self.attack_sprites:
+            attacked_sprites = pygame.sprite.spritecollide(attack_sprite, self.attackable_sprites, False)
+            for attacked_sprite in attacked_sprites:
+                attacked_sprite.damage(
+                    attack_type=attack_sprite.get_type(),
+                    attack_damage=attack_sprite.get_damage()
+                )
+
+    def enemy_attack(self, attack_type : str, attack_damage : Number):
+        self.player.damage(attack_type, attack_damage)
+
+    def game_over(self):
+        print('game over D:')
+        self.running = False
+
     def run(self) -> None:
-        self.visible_sprites.custom_draw(self.player)
-        self.visible_sprites.enemy_update(self.player)
-        self.visible_sprites.update()
-        self.ui.display(self.player)
+        if self.running:
+            self.visible_sprites.custom_draw(self.player)
+            self.visible_sprites.enemy_update(self.player)
+            self.player_attack()
+            self.visible_sprites.update()
+            self.ui.display(self.player)

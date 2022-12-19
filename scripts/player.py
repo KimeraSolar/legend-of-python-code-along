@@ -7,8 +7,9 @@ from numbers import Number
 from utils import import_folder
 
 class Player(DynamicSprite):
-    def __init__(self, pos : tuple, collision_sprites : pygame.sprite.Group, groups:  pygame.sprite.Group | list[pygame.sprite.Group], create_attack : Callable, destroy_attack : Callable, create_magic : Callable, destroy_magic : Callable) -> None:
+    def __init__(self, pos : tuple, collision_sprites : pygame.sprite.Group, groups:  pygame.sprite.Group | list[pygame.sprite.Group], create_attack : Callable, destroy_attack : Callable, create_magic : Callable, destroy_magic : Callable, end_game : Callable) -> None:
         surface = pygame.image.load(GRAPHICS_PATH + 'test' + FOLDER_SEPARATOR + 'player.png').convert_alpha()
+        self.end_game = end_game
         self.stats_setup()
         self.attack_setup(create_attack, destroy_attack, create_magic, destroy_magic)
         self.graphics_setup()
@@ -53,6 +54,7 @@ class Player(DynamicSprite):
         self.timers['magic'] = Timer(200, on_timeout=self.destroy_magic)
         self.timers['magic switch cooldown'] = Timer(300)
         self.timers['action cooldown'] = Timer(500)
+        self.timers['damage cooldown'] = Timer(500)
 
     def input(self) -> None:
         pressed_keys = pygame.key.get_pressed()
@@ -113,7 +115,11 @@ class Player(DynamicSprite):
     def move(self, speed: Number) -> None:
         if self.timers['attack'].active or self.timers['magic'].active:
             return
-        super().move(speed)
+        super().move(speed)        
+
+    def kill_sprite(self):
+        self.end_game()
+        super().kill_sprite()
 
     def update(self) -> None:
         self.input()

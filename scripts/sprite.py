@@ -1,23 +1,28 @@
 from numbers import Number
 import pygame
+from event_timer import Timer
+from math import sin
 from settings import *
 
-
 class GenericSprite(pygame.sprite.Sprite):
-    def __init__(self, pos : tuple, surface : pygame.Surface, groups: pygame.sprite.Group | list[pygame.sprite.Group] ) -> None:
+    def __init__(self, pos : tuple, surface : pygame.Surface, groups: pygame.sprite.Group | list[pygame.sprite.Group] , layer : str = 'main') -> None:
         super().__init__(groups)
         self.image = surface
         self.rect = self.image.get_rect(topleft=pos)
+        self.z_layer = LAYERS[layer]
 
+    def damage(self, attack_type : str, attack_damage : Number) -> None:
+        pass
+        # print('attacked by', attack_type, 'dealing', attack_damage, 'damage')
 
 class CollidableSprite(GenericSprite):
-    def __init__(self, pos : tuple, surface : pygame.Surface, groups: pygame.sprite.Group | list[pygame.sprite.Group], inflation_rate: tuple = (0, -10)) -> None:
-        super().__init__(pos, surface, groups)
+    def __init__(self, pos : tuple, surface : pygame.Surface, groups: pygame.sprite.Group | list[pygame.sprite.Group], inflation_rate: tuple = (0, -10), layer : str = 'main') -> None:
+        super().__init__(pos, surface, groups, layer)
         self.hitbox = self.rect.inflate(inflation_rate)
 
 class DynamicSprite(CollidableSprite):
-    def __init__(self, pos : tuple, surface : pygame.Surface, collision_sprites : pygame.sprite.Group, groups: pygame.sprite.Group | list[pygame.sprite.Group], inflation_rate: tuple = (0, -10)) -> None:
-        super().__init__(pos, surface, groups)
+    def __init__(self, pos : tuple, surface : pygame.Surface, collision_sprites : pygame.sprite.Group, groups: pygame.sprite.Group | list[pygame.sprite.Group], inflation_rate: tuple = (0, -10), layer : str = 'main') -> None:
+        super().__init__(pos, surface, groups, layer=layer)
         self.hitbox = self.rect.inflate(inflation_rate)
         self.dynamics_setup(collision_sprites)
         self.timers_setup()
@@ -25,6 +30,8 @@ class DynamicSprite(CollidableSprite):
             
     def timers_setup(self) -> None:
         self.timers = {}
+        self.timers['flicker timer'] = Timer(150)
+        self.timers['damage cooldown'] = Timer(200)
     
     def update_timers(self) -> None:
         for timer in self.timers.values():
@@ -74,6 +81,29 @@ class DynamicSprite(CollidableSprite):
         self.frame_index %= len(self.animations[self.status])
         self.image = self.animations[self.status][int(self.frame_index)]
         self.rect = self.image.get_rect(center = self.hitbox.center)
+
+        if self.timers['flicker timer'].active:
+            alpha = self.get_alpha_flicker()
+            self.image.set_alpha(alpha)
+        else:
+            self.image.set_alpha(255)
+
+    def get_alpha_flicker(self):
+        value = sin(pygame.time.get_ticks())
+        value = 255 if value >= 0 else 0
+        return value
+
+    def damage(self, attack_type: str, attack_damage: Number) -> None:
+        super().damage(attack_type, attack_damage)
+        if not self.timers['damage cooldown'].active:
+            self.timers['flicker timer'].activate()
+            self.health -= attack_damage
+            self.timers['damage cooldown'].activate()
+        if self.health <= 0:
+            self.kill_sprite()
+
+    def kill_sprite(self):
+        self.kill()
 
     def update(self) -> None:
         self.update_timers()
